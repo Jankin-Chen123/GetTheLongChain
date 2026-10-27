@@ -33,6 +33,8 @@ cd GetTheLongChain
 
 也可下载仓库 ZIP，解压后双击 `start.cmd`。首次启动自动创建 `.venv` 并安装依赖。启动成功后，在浏览器打开 **[http://127.0.0.1:8788](http://127.0.0.1:8788)**。保持启动窗口运行，按 `Ctrl+C` 停止。
 
+启动脚本优先通过 Windows 系统路径查找 PowerShell，不依赖 PATH 中的 `powershell.exe`；也支持 PATH 中的 PowerShell 7（`pwsh.exe`）。启动失败会保留窗口显示错误。
+
 ### 手动启动
 
 Windows PowerShell：

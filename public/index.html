@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>长链接生成器 · GetTheLongChain</title>
+  <link rel="icon" type="image/png" href="/static/assets/brand.png">
+  <link rel="stylesheet" href="/static/workspace.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-header">
+      <div class="brand-mark" aria-hidden="true"><img src="/static/assets/brand.png" alt=""></div>
+      <div><p class="eyebrow">GET THE LONG CHAIN</p>
+        <h1>长链接生成器</h1>
+      </div>
+      <span id="service" class="service">连接中</span>
+    </header>
+
+    <section class="workspace">
+      <form id="checkoutForm" autocomplete="off">
+        <div class="columns">
+          <section class="column credentials" aria-labelledby="credentialTitle">
+            <div class="section-heading"><div><span class="step">01</span><h2 id="credentialTitle">账号凭证</h2></div><span class="section-tag">ACCOUNT</span></div>
+            <div class="label-row"><label for="token">accessToken / Session</label><a class="text-button" href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">获取 Session ↗</a></div>
+            <textarea id="token" required spellcheck="false" placeholder="粘贴 accessToken 或 Session JSON"></textarea>
+            <div class="small-actions"><button type="button" class="text-button" id="copySession">复制获取地址</button><button type="button" class="text-button muted" id="clearSecrets">清空</button></div>
+            <div class="field"><label for="proxy">代理地址 <span>可选</span></label>
+              <div class="input-action"><input id="proxy" type="password" placeholder="http://127.0.0.1:7890" spellcheck="false"><button type="button" class="secondary compact" id="testProxy" disabled>测试连接</button></div>
+              <div id="proxyResult" class="privacy-note" role="status" aria-live="polite" hidden></div>
+            </div>
+            <div class="field" id="keyField" hidden><label for="accessKey">访问口令</label><input type="password" id="accessKey" placeholder="填写服务端设置的口令"></div>
+          </section>
+
+          <section class="column" aria-labelledby="paramsTitle">
+            <div class="section-heading"><div><span class="step">02</span><h2 id="paramsTitle">结账参数</h2></div><span class="section-tag">CHECKOUT</span></div>
+            <label for="spaceMode">工作区</label>
+            <select id="spaceMode"><option value="new">新建工作区</option><option value="existing">使用已有工作区</option></select>
+            <div class="field" id="newWorkspace"><label for="workspaceName">工作区名称</label><input id="workspaceName" value="My Team" required maxlength="100"></div>
+            <div id="existingWorkspace" class="field" hidden>
+              <div class="label-row"><label for="workspaceSelect">已有工作区</label><button type="button" class="text-button" id="loadWorkspaces">查询工作区</button></div>
+              <select id="workspaceSelect"><option value="">先查询，再选择工作区</option></select>
+              <label class="sub-label" for="workspaceId">工作区 ID</label><input id="workspaceId" placeholder="Workspace ID（UUID）" spellcheck="false">
+            </div>
+            <div class="row field"><div><label for="seats">席位数量 <span>至少 2</span></label><input id="seats" type="number" value="2" min="2" max="999" step="1" required></div>
+              <div><label for="interval">计费周期</label><select id="interval"><option value="month">按月</option><option value="year">按年</option></select></div></div>
+            <div class="field country-search-field"><label for="countrySearch">搜索国家 / 地区</label><div class="search-input"><span aria-hidden="true">⌕</span><input id="countrySearch" type="search" placeholder="中文名、英文名或国家代码" autocomplete="off" aria-controls="country"></div></div>
+            <div class="row field"><div><label for="country">国家 / 地区 <span class="required">必填</span></label><select id="country" required><option value="">请选择</option></select></div>
+              <div class="currency-field"><label for="currency">货币</label><select id="currency" required><option value="">请选择</option></select></div></div>
+            <div class="field"><label for="promo">优惠码 <span>可选</span></label><input id="promo" placeholder="优惠码或含优惠码的链接" maxlength="2048"></div>
+          </section>
+        </div>
+        <footer class="form-footer"><section id="status" class="status" role="status" aria-live="polite">就绪</section><button id="generate" class="primary" type="submit" disabled>生成结账链接 <span aria-hidden="true">↗</span></button></footer>
+      </form>
+    </section>
+
+    <details id="errorDetails" class="card notes" hidden><summary>查看错误详情（已脱敏）</summary><pre id="errorText"></pre><button id="copyError" class="text-button" type="button">复制错误详情</button></details>
+    <section id="result" class="card result" hidden>
+      <div class="result-heading"><div><p class="eyebrow">CHECKOUT READY</p><h2>结账链接已生成</h2></div><span class="success-badge">已就绪</span></div>
+      <p id="resultMeta" class="hint"></p><a id="resultUrl" class="result-url" target="_blank" rel="noopener noreferrer"></a>
+      <div class="result-actions"><button id="copyLink" class="primary" type="button">复制链接</button><a id="openLink" class="secondary" target="_blank" rel="noopener noreferrer">打开结账页 ↗</a></div>
+    </section>
+    <details class="card notes"><summary>使用说明</summary><ul>
+      <li>仅用于你自己有权限的账号与工作区。此工具不是 OpenAI 官方产品。</li>
+      <li>服务从本机连接 ChatGPT；需要初始化托管页时会单独连接 Stripe，不向 Stripe 转发账号 accessToken。</li>
+      <li>工具不保存凭证、代理地址或生成的链接；只记住工作区名称、席位与计费周期。</li>
+      <li>如遇 401，请更新 Session；403 检查账号权限和网络；429 请等待后重试。</li>
+    </ul></details>
+    <footer class="page-footer"><span>GetTheLongChain</span><span>本机运行 · 自用版</span></footer>
+  </main>
+</body>
+</html>

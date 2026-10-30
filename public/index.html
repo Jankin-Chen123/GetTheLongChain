@@ -16,8 +16,13 @@
       <div><p class="eyebrow">GET THE LONG CHAIN</p>
         <h1>长链接生成器</h1>
       </div>
-      <span id="service" class="service">连接中</span>
+      <span id="service" class="service" role="status">服务器地址：检测中…</span>
     </header>
+
+    <section class="card notes usage-notes" aria-labelledby="usageTitle"><h2 id="usageTitle">使用说明</h2><ul>
+      <li>不知道什么是代理节点的，去<a href="https://aibaipiao.top/docs" target="_blank" rel="noopener noreferrer">aibaipiao.top/docs</a>教程文档看</li>
+      <li>本服务不会记录用户信息，只负责发送支付请求从而获取支付长链接，大家放心使用</li>
+    </ul></section>
 
     <section class="workspace">
       <form id="checkoutForm" autocomplete="off">
@@ -27,29 +32,23 @@
             <div class="label-row"><label for="token">accessToken / Session</label><a class="text-button" href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">获取 Session ↗</a></div>
             <textarea id="token" required spellcheck="false" placeholder="粘贴 accessToken 或 Session JSON"></textarea>
             <div class="small-actions"><button type="button" class="text-button" id="copySession">复制获取地址</button><button type="button" class="text-button muted" id="clearSecrets">清空</button></div>
-            <div class="field"><label for="proxy">代理地址 <span>可选</span></label>
+            <div class="field"><div class="label-row"><label for="proxy">代理地址 <span>可选</span></label><button type="button" id="openProxyGuide" class="text-button" aria-haspopup="dialog" aria-controls="proxyGuide">动态代理获取教程 ↗</button></div>
               <div class="input-action"><input id="proxy" type="password" placeholder="http://127.0.0.1:7890" spellcheck="false"><button type="button" class="secondary compact" id="testProxy" disabled>测试连接</button></div>
+              <p id="proxyHint" class="hint">不提供代理地址时，默认从检测中的地区发送请求</p>
               <div id="proxyResult" class="privacy-note" role="status" aria-live="polite" hidden></div>
             </div>
             <div class="field" id="keyField" hidden><label for="accessKey">访问口令</label><input type="password" id="accessKey" placeholder="填写服务端设置的口令"></div>
           </section>
 
-          <section class="column" aria-labelledby="paramsTitle">
+          <section class="column checkout-fields" aria-labelledby="paramsTitle">
             <div class="section-heading"><div><span class="step">02</span><h2 id="paramsTitle">结账参数</h2></div><span class="section-tag">CHECKOUT</span></div>
-            <label for="spaceMode">工作区</label>
-            <select id="spaceMode"><option value="new">新建工作区</option><option value="existing">使用已有工作区</option></select>
-            <div class="field" id="newWorkspace"><label for="workspaceName">工作区名称</label><input id="workspaceName" value="My Team" required maxlength="100"></div>
-            <div id="existingWorkspace" class="field" hidden>
-              <div class="label-row"><label for="workspaceSelect">已有工作区</label><button type="button" class="text-button" id="loadWorkspaces">查询工作区</button></div>
-              <select id="workspaceSelect"><option value="">先查询，再选择工作区</option></select>
-              <label class="sub-label" for="workspaceId">工作区 ID</label><input id="workspaceId" placeholder="Workspace ID（UUID）" spellcheck="false">
-            </div>
-            <div class="row field"><div><label for="seats">席位数量 <span>至少 2</span></label><input id="seats" type="number" value="2" min="2" max="999" step="1" required></div>
+            <div class="workspace-name"><label for="workspaceName">工作区名称</label><input id="workspaceName" value="My Team" required maxlength="100"></div>
+            <div class="row field seat-cycle"><div><label for="seats">席位数量 <span>至少 2</span></label><input id="seats" type="number" value="2" min="2" max="999" step="1" required></div>
               <div><label for="interval">计费周期</label><select id="interval"><option value="month">按月</option><option value="year">按年</option></select></div></div>
             <div class="field country-search-field"><label for="countrySearch">搜索国家 / 地区</label><div class="search-input"><span aria-hidden="true">⌕</span><input id="countrySearch" type="search" placeholder="中文名、英文名或国家代码" autocomplete="off" aria-controls="country"></div></div>
-            <div class="row field"><div><label for="country">国家 / 地区 <span class="required">必填</span></label><select id="country" required><option value="">请选择</option></select></div>
+            <div class="row field billing-row"><div><label for="country">国家 / 地区 <span class="required">必填</span></label><select id="country" required><option value="">请选择</option></select></div>
               <div class="currency-field"><label for="currency">货币</label><select id="currency" required><option value="">请选择</option></select></div></div>
-            <div class="field"><label for="promo">优惠码 <span>可选</span></label><input id="promo" placeholder="优惠码或含优惠码的链接" maxlength="2048"></div>
+            <div class="field promo-field"><label for="promo">优惠码 <span>可选</span></label><input id="promo" placeholder="优惠码或含优惠码的链接" maxlength="2048" aria-describedby="promoHint"><p id="promoHint" class="hint">使用优惠码时，所选国家 / 地区需在优惠码适用范围内</p></div>
           </section>
         </div>
         <footer class="form-footer"><section id="status" class="status" role="status" aria-live="polite">就绪</section><button id="generate" class="primary" type="submit" disabled>生成结账链接 <span aria-hidden="true">↗</span></button></footer>
@@ -62,13 +61,17 @@
       <p id="resultMeta" class="hint"></p><a id="resultUrl" class="result-url" target="_blank" rel="noopener noreferrer"></a>
       <div class="result-actions"><button id="copyLink" class="primary" type="button">复制链接</button><a id="openLink" class="secondary" target="_blank" rel="noopener noreferrer">打开结账页 ↗</a></div>
     </section>
-    <details class="card notes"><summary>使用说明</summary><ul>
-      <li>仅用于你自己有权限的账号与工作区。此工具不是 OpenAI 官方产品。</li>
-      <li>服务从本机连接 ChatGPT；需要初始化托管页时会单独连接 Stripe，不向 Stripe 转发账号 accessToken。</li>
-      <li>工具不保存凭证、代理地址或生成的链接；只记住工作区名称、席位与计费周期。</li>
-      <li>如遇 401，请更新 Session；403 检查账号权限和网络；429 请等待后重试。</li>
-    </ul></details>
-    <footer class="page-footer"><span>GetTheLongChain</span><span>本机运行 · 自用版</span></footer>
+    <footer class="page-footer"><span>GetTheLongChain</span><span>爱白嫖公益站出品，交流qq群：1097280864</span></footer>
   </main>
+  <dialog id="proxyGuide" class="guide-dialog" aria-labelledby="proxyGuideTitle">
+    <header class="guide-header"><h2 id="proxyGuideTitle">动态代理获取教程</h2><button type="button" id="closeProxyGuide" class="guide-close" aria-label="关闭教程" autofocus>×</button></header>
+    <div class="guide-body">
+      <ol class="guide-steps">
+        <li><h3>打开网站</h3><p>点击访问 <a href="https://www.kookeey.com" target="_blank" rel="noopener noreferrer">www.kookeey.com ↗</a></p></li>
+        <li><h3>领取测试礼包</h3><p>在“动态住宅代理”的“购买流量包”页面，找到测试礼包并联系客服领取</p><a class="guide-image-link" href="/static/assets/proxy-trial.png" target="_blank" rel="noopener noreferrer" aria-label="在新标签页查看测试礼包配图"><img src="/static/assets/proxy-trial.png" alt="图一：动态住宅代理页面中的测试礼包与联系客服领取按钮" loading="lazy" width="1476" height="1584"></a></li>
+        <li><h3>提取动态 IP</h3><p>在“提取动态IP”页面选择所需国家，代理协议设置为 <strong>SOCKS5</strong>，IP 轮转周期设置为<strong>粘性</strong>，其他信息保持默认</p><p>点击“生成连接信息”，复制后粘贴到本页面的代理地址中即可</p><a class="guide-image-link" href="/static/assets/proxy-extraction.png" target="_blank" rel="noopener noreferrer" aria-label="在新标签页查看动态 IP 设置配图"><img src="/static/assets/proxy-extraction.png" alt="图二：选择国家、SOCKS5、粘性轮转后生成并复制连接信息，账号与密码已遮盖" loading="lazy" width="1535" height="1025"></a></li>
+      </ol>
+    </div>
+  </dialog>
 </body>
 </html>

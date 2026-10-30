@@ -91,3 +91,13 @@ def test_discount_ineligible_explains_connection_succeeded(client, monkeypatch):
     data = client.post('/api/checkout', json={'token': 'valid.shape.token', 'country': 'CO', 'currency': 'COP'}).json()
     assert '已连接到 ChatGPT' in data['error']
     assert '清空优惠码' in data['error']
+
+@pytest.mark.parametrize('raw, expected', [
+    ('gate.kookeey.info:1000:demo-user:demo-pass', 'socks5://demo-user:demo-pass@gate.kookeey.info:1000'),
+    ('gate.kookeey.info:1000:demo@user:demo/pass', 'socks5://demo%40user:demo%2Fpass@gate.kookeey.info:1000'),
+    ('proxy.example.com:1000:demo-user:demo-pass', 'http://demo-user:demo-pass@proxy.example.com:1000'),
+    ('fakekookeey.info:1000:demo-user:demo-pass', 'http://demo-user:demo-pass@fakekookeey.info:1000'),
+    ('http://demo-user:demo-pass@gate.kookeey.info:1000', 'http://demo-user:demo-pass@gate.kookeey.info:1000'),
+])
+def test_tutorial_proxy_format_and_explicit_protocol(raw, expected):
+    assert server.normalize_proxy(raw) == expected

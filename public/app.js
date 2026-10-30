@@ -19,7 +19,6 @@ function clearErrorDetails() {
 function setBusy(value) {
   busy = value;
   $('generate').disabled = value || !ready;
-  $('loadWorkspaces').disabled = value || !ready;
   $('testProxy').disabled = value || !ready;
   $('generate').textContent = value ? '请求处理中…' : '生成结账链接 ↗';
 }
@@ -44,14 +43,6 @@ function filterCountries() {
   for (const entry of matches) $('country').appendChild(new Option(entry.label, entry.code));
   $('country').value = matches.some(entry => entry.code === selected) ? selected : '';
   if ($('country').value !== selected) syncCountry();
-}
-
-function syncWorkspace() {
-  const existing = $('spaceMode').value === 'existing';
-  $('newWorkspace').hidden = existing;
-  $('existingWorkspace').hidden = !existing;
-  $('workspaceName').required = !existing;
-  $('workspaceId').required = existing;
 }
 
 function credentials() {
@@ -84,17 +75,27 @@ function trustedUrl(value) {
   } catch { return false; }
 }
 
-$('spaceMode').addEventListener('change', syncWorkspace);
+$('openProxyGuide').addEventListener('click', () => {
+  $('proxyGuide').showModal();
+  document.body.classList.add('guide-open');
+});
+$('closeProxyGuide').addEventListener('click', () => $('proxyGuide').close());
+$('proxyGuide').addEventListener('close', () => {
+  document.body.classList.remove('guide-open');
+  $('openProxyGuide').focus();
+});
+$('proxyGuide').addEventListener('click', event => {
+  const bounds = $('proxyGuide').getBoundingClientRect();
+  if (event.target === $('proxyGuide') && (event.clientX < bounds.left || event.clientX > bounds.right
+      || event.clientY < bounds.top || event.clientY > bounds.bottom)) $('proxyGuide').close();
+});
+
 $('country').addEventListener('change', syncCountry);
 $('countrySearch').addEventListener('input', filterCountries);
 $('countrySearch').addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); $('country').focus(); }
   if (event.key === 'Escape') { $('countrySearch').value = ''; filterCountries(); }
 });
-$('workspaceSelect').addEventListener('change', () => {
-  $('workspaceId').value = $('workspaceSelect').value;
-});
-
 $('clearSecrets').addEventListener('click', () => {
   for (const id of ['token', 'proxy', 'accessKey']) $(id).value = '';
   $('proxyResult').hidden = true;
@@ -137,29 +138,6 @@ $('testProxy').addEventListener('click', async () => {
   } finally { setBusy(false); $('testProxy').textContent = '测试连接'; }
 });
 
-$('loadWorkspaces').addEventListener('click', async () => {
-  if (busy) return;
-  if (!$('token').value.trim()) { $('token').focus(); return status('请先填写账号凭证。', 'error'); }
-  clearErrorDetails();
-  setBusy(true);
-  status('正在查询账号的工作区…', 'loading');
-  $('workspaceSelect').replaceChildren(new Option('查询中…', ''));
-  $('workspaceId').value = '';
-  try {
-    const data = await api('/api/workspaces', credentials());
-    $('workspaceSelect').replaceChildren(new Option('请选择工作区', ''));
-    for (const item of data.workspaces) {
-      const option = new Option(`${item.name}${item.role ? ` · ${item.role}` : ''}`, item.id);
-      option.dataset.name = item.name;
-      $('workspaceSelect').appendChild(option);
-    }
-    status(data.workspaces.length ? `找到 ${data.workspaces.length} 个工作区，请选择。` : '没有找到团队工作区，也可以手动填写 ID。');
-  } catch (error) {
-    $('workspaceSelect').replaceChildren(new Option('查询失败，可重试或手动填 ID', ''));
-    status(error.message, 'error');
-  } finally { setBusy(false); }
-});
-
 $('checkoutForm').addEventListener('submit', async event => {
   event.preventDefault();
   if (busy || !ready) return;
@@ -170,10 +148,9 @@ $('checkoutForm').addEventListener('submit', async event => {
   $('openLink').removeAttribute('href');
   setBusy(true);
   status('正在创建 Team 结账链接，请等待。遇到超时不会自动重复创建。', 'loading');
-  const existing = $('spaceMode').value === 'existing';
-  const body = {...credentials(), spaceMode: $('spaceMode').value,
-    workspaceName: existing ? ($('workspaceSelect').selectedOptions[0]?.dataset.name || 'My Team') : $('workspaceName').value.trim(),
-    existingWorkspaceId: existing ? $('workspaceId').value.trim() : '',
+  const body = {...credentials(), spaceMode: 'new',
+    workspaceName: $('workspaceName').value.trim(),
+    existingWorkspaceId: '',
     seatQuantity: Number($('seats').value), country: $('country').value, currency: $('currency').value,
     priceInterval: $('interval').value, promoCode: $('promo').value.trim()};
   try {
@@ -182,7 +159,7 @@ $('checkoutForm').addEventListener('submit', async event => {
     $('resultUrl').textContent = data.url;
     $('resultUrl').href = data.url;
     $('openLink').href = data.url;
-    $('resultMeta').textContent = `${body.country} / ${body.currency} · ${body.seatQuantity} 席 · ${body.priceInterval === 'month' ? '按月' : '按年'} · ${existing ? '已有工作区' : body.workspaceName}`;
+    $('resultMeta').textContent = `${body.country} / ${body.currency} · ${body.seatQuantity} 席 · ${body.priceInterval === 'month' ? '按月' : '按年'} · ${body.workspaceName}`;
     $('result').hidden = false;
     status('生成成功，请打开结账页核对金额与订阅信息。', 'success');
     try { localStorage.setItem(paramsKey, JSON.stringify({name: $('workspaceName').value, seats: body.seatQuantity, interval: body.priceInterval})); } catch {}
@@ -190,6 +167,21 @@ $('checkoutForm').addEventListener('submit', async event => {
   } catch (error) { status(error.message, 'error'); }
   finally { setBusy(false); }
 });
+
+function showServerLocation(country, detected = false) {
+  $('service').textContent = `服务器地址：${country}`;
+  $('service').classList.toggle('online', detected);
+  $('proxyHint').textContent = `不提供代理地址时，默认从${country}发送请求`;
+}
+
+async function loadServerLocation() {
+  try {
+    const response = await fetch('/api/server-location', {cache: 'no-store'});
+    const data = await response.json();
+    if (!response.ok || !data.ok || !data.detected || !data.country) throw new Error();
+    showServerLocation(data.country, true);
+  } catch { showServerLocation('无法检测'); }
+}
 
 async function init() {
   try {
@@ -211,8 +203,7 @@ async function init() {
     $('keyField').hidden = !data.requireKey;
     $('accessKey').required = data.requireKey;
     ready = true;
-    $('service').textContent = '服务已连接';
-    $('service').classList.add('online');
+    void loadServerLocation();
     try {
       const saved = JSON.parse(localStorage.getItem(paramsKey) || '{}');
       if (typeof saved.name === 'string') $('workspaceName').value = saved.name;
@@ -220,10 +211,9 @@ async function init() {
       if (['month', 'year'].includes(saved.interval)) $('interval').value = saved.interval;
     } catch {}
   } catch {
-    $('service').textContent = '本地服务未连接';
+    showServerLocation('无法检测');
     status('无法连接本地服务，请重新运行启动脚本后刷新页面。', 'error');
   }
-  syncWorkspace();
   setBusy(false);
 }
 init();

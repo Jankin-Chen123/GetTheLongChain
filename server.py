@@ -32,6 +32,8 @@ CURRENCY_CODES = {code for code, _ in CURRENCIES}
 TRUSTED_HOSTS = {'checkout.stripe.com', 'pay.openai.com', 'chatgpt.com'}
 UPSTREAM = 'https://chatgpt.com'
 CHECKOUT_LOCK = threading.Lock()
+LOCATION_LOCK = threading.Lock()
+LOCATION_CACHE = {'expires': 0, 'country_code': '', 'country': ''}
 
 
 class ToolError(Exception):
@@ -91,7 +93,11 @@ def normalize_proxy(value: str) -> str:
         parts = value.split(':')
         if len(parts) == 4:
             host, port, user, password = parts
-            value = f'http://{quote(user, safe="")}:{quote(password, safe="")}@{host}:{port}'
+            # The Kookeey SOCKS5 tutorial exports host:port:user:password.
+            # Explicit URL schemes always take precedence; other bare providers keep HTTP.
+            provider = host.lower().rstrip('.')
+            scheme = 'socks5' if provider == 'kookeey.info' or provider.endswith('.kookeey.info') else 'http'
+            value = f'{scheme}://{quote(user, safe="")}:{quote(password, safe="")}@{host}:{port}'
         else:
             value = 'http://' + value
     try:
@@ -348,7 +354,7 @@ async def request_logging(request: Request, call_next):
     remember_secrets(request.headers.get('X-Access-Key'))
     # Never record query strings, headers, bodies, or arbitrary URL paths.
     known_paths = {'/', '/api/health', '/api/checkout', '/api/workspaces', '/api/proxy-test',
-                   '/static/app.js', '/static/style.css', '/static/workspace.css'}
+                   '/api/server-location', '/static/app.js', '/static/style.css', '/static/workspace.css'}
     path = request.url.path if request.url.path in known_paths else '[other]'
     started = time.perf_counter()
     event('request_start', method=request.method, path=path)
@@ -422,6 +428,31 @@ def index():
 def health():
     return {'ok': True, 'requireKey': bool(os.getenv('GETTHELONGCHAIN_ACCESS_KEY')),
             'countries': COUNTRIES, 'currencies': CURRENCIES}
+
+
+@app.get('/api/server-location')
+def server_location():
+    # Use the same direct network settings as checkout without a proxy.
+    # Only retain the country; never expose or log the trace body or exit IP.
+    with LOCATION_LOCK:
+        if time.monotonic() >= LOCATION_CACHE['expires']:
+            code = ''
+            try:
+                with requests.Session(impersonate='chrome', trust_env=False) as session:
+                    response = session.request('GET', 'https://www.cloudflare.com/cdn-cgi/trace',
+                                               timeout=8, allow_redirects=False)
+                    if response.status_code == 200:
+                        trace = dict(line.split('=', 1) for line in response.text.splitlines() if '=' in line)
+                        candidate = trace.get('loc', '').strip().upper()
+                        if candidate in CURRENCY_MAP:
+                            code = candidate
+            except requests.RequestsError:
+                pass
+            country = next((name for country_code, _, name in COUNTRIES if country_code == code), '')
+            LOCATION_CACHE.update(country_code=code, country=country,
+                                  expires=time.monotonic() + (900 if code else 60))
+        return {'ok': True, 'detected': bool(LOCATION_CACHE['country_code']),
+                'country_code': LOCATION_CACHE['country_code'], 'country': LOCATION_CACHE['country']}
 
 
 @app.post('/api/proxy-test', dependencies=[Depends(authorize)])
